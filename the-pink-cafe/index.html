@@ -31,6 +31,7 @@ a { color: var(--red-deep); }
 
 .stations { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px 26px; padding-top: 16px; padding-bottom: 4px; }
 .stations img { height: 38px; width: auto; }
+.stations.single img { height: 64px; }
 .stations:empty { display: none; }
 
 /* Hero */
@@ -465,7 +466,12 @@ h2.section { text-align: center; }
     if (tick()) var timer = setInterval(function () { if (!tick()) clearInterval(timer); }, 1000);
   })();
 
+  var multi = P.radio.stations.length > 1;
+  var perDay = function (p) { return p.per_day || 4; };
+  var freq = P.radio.frequency_text || "4 times a day";
+
   /* Station logos (header shows only when logos are supplied) */
+  if (!multi) $("stations").classList.add("single");
   P.radio.stations.forEach(function (s) { if (s.logo) $("stations").appendChild(el("img", { src: s.logo, alt: s.name })); });
   if (D.daily_logo) $("stations").appendChild(el("img", { src: D.daily_logo, alt: "NorthumberlandDAILY.ca" }));
 
@@ -644,10 +650,10 @@ h2.section { text-align: center; }
     var lines = [], total = 0, radio = 0;
     sel.stations.forEach(function (s) { lines.push([s.name + ", " + sel.pkg.days + " days", money(sel.pkg.price)]); radio += sel.pkg.price; });
     var save = 0;
-    if (sel.stations.length === P.radio.stations.length) { save = sel.pkg.price * P.radio.third_station_discount; radio -= save; lines.push(["All 3 stations saving", "\u2212" + money(save), "save"]); }
+    if (multi && sel.stations.length === P.radio.stations.length) { save = sel.pkg.price * P.radio.third_station_discount; radio -= save; lines.push(["All 3 stations saving", "\u2212" + money(save), "save"]); }
     total = radio;
     if (sel.digital) { lines.push(["Web greeting, " + sel.digital.label.toLowerCase(), money(sel.digital.price)]); total += sel.digital.price; }
-    var airings = 4 * sel.pkg.days * sel.stations.length;
+    var airings = perDay(sel.pkg) * sel.pkg.days * sel.stations.length;
     return { lines: lines, total: total, radio: radio, save: save, airings: airings };
   }
 
@@ -673,13 +679,15 @@ h2.section { text-align: center; }
     var o = el("option", { value: st.id }, esc(st.name));
     if (st.id === state.simpleStation) o.selected = true; ss.appendChild(o);
   });
-  ss.appendChild(el("option", { value: "all" }, "All 3 stations (third station half price)"));
+  if (multi) ss.appendChild(el("option", { value: "all" }, "All 3 stations (third station half price)"));
+  else ss.closest(".station-row").style.display = "none";
+  if (!multi && P.digital.websites.length < 2) $("custom-toggle").style.display = "none";
   ss.addEventListener("change", function () { state.simpleStation = ss.value; render(); });
 
   P.radio.packages.forEach(function (p) {
     var card = el("label", { class: "bundle", "data-id": p.id });
     card.innerHTML = "<input type='radio' name='bundle' value='" + p.id + "'>" + (p.best_value ? "<span class='badge'>Best value</span>" : "") +
-      "<h3>" + p.days + " days</h3><p class='bprice'></p><p class='per'></p><ul><li>4 airings a day</li><li class='airings'></li><li class='save' hidden></li></ul>";
+      "<h3>" + p.days + " days</h3><p class='bprice'></p><p class='per'></p><ul><li>" + perDay(p) + " airings a day</li><li class='airings'></li><li class='save' hidden></li></ul>";
     var input = card.querySelector("input");
     if (p === state.simplePkg) input.checked = true;
     input.addEventListener("change", function () { state.simplePkg = p; render(); });
@@ -772,7 +780,7 @@ h2.section { text-align: center; }
       "Hi " + first + ",", "",
       bizName ? "Please reserve this Christmas Greeting for " + bizName + ":" : "Please reserve a Christmas Greeting for my business:", "",
     ].concat(G && !bizName ? ["Business name: ", "Address: ", ""] : []).concat(sc ? ["Script " + (chosenScript + 1) + ": " + sc.title] : []).concat([
-      "Radio: 4 airings a day for " + sel.pkg.days + " days",
+      "Radio: " + perDay(sel.pkg) + " airings a day for " + sel.pkg.days + " days",
       "Stations: " + sel.stations.map(function (s) { return s.name; }).join(", "),
       "Web greeting: " + (sel.digital ? sel.digital.label + " on " + sel.sites.join(", ") : "None"),
       "Total before tax: " + money(q.total), ""
@@ -792,12 +800,12 @@ h2.section { text-align: center; }
 
   if (bill.short) $("approve").innerHTML = "<strong>" + esc(bill.short) + "</strong> Invoiced November 1, net 30.<br>Nothing airs until you approve your script.";
   if (bill.detail) $("need-bill").textContent = bill.detail;
-  $("order-intro").innerHTML = "Radio greetings are scheduled between " + esc(P.radio.air_dates) + ", 4 times a day between " + esc(P.radio.air_hours.replace(" to ", " and ")) + ". " + (dl ? "<span class='deadline'>" + esc(dl) + "</span>" : "");
-  $("inc-air").innerHTML = "<b>On air between " + esc(P.radio.air_dates) + "</b>, 4 times a day, " + esc(P.radio.air_hours) + " on your selected package. Web greetings run " + esc(P.digital.serve_dates) + ".";
+  $("order-intro").innerHTML = "Radio greetings are scheduled between " + esc(P.radio.air_dates) + ", " + esc(freq) + " between " + esc(P.radio.air_hours.replace(" to ", " and ")) + ". " + (dl ? "<span class='deadline'>" + esc(dl) + "</span>" : "");
+  $("inc-air").innerHTML = "<b>On air between " + esc(P.radio.air_dates) + "</b>, " + esc(freq) + ", " + esc(P.radio.air_hours) + " on your selected package. Web greetings run " + esc(P.digital.serve_dates) + ".";
 
   /* FAQ */
   var faqs = [
-    ["Will anyone actually hear it?", "Yes. Our three stations are local radio, heard every week by thousands of people who live, work, and shop in Northumberland. Your greeting airs 4 times a day between " + P.radio.air_hours.replace(" to ", " and ") + ", while they’re driving, working, and running errands."],
+    ["Will anyone actually hear it?", "Yes. " + (P.radio.reach_faq || "Our three stations are local radio, heard every week by thousands of people who live, work, and shop in Northumberland.") + " Your greeting airs " + freq + " between " + P.radio.air_hours.replace(" to ", " and ") + ", while they’re driving, working, and running errands."],
     ["Will this bring in sales?", "It isn't a sales ad, and we won't pretend it is. It's a thank-you your customers hear in their car and kitchen, from a business they know. That's why " + (PR.participants || "so many") + " local businesses send one."],
     ["What if I don't love the script?", "Tell " + first + " what to change and we'll revise it. Nothing airs until you approve it."],
     ["Why book in October?", dl ? "Booking now locks in pre-sale pricing, which ends " + P.offer_note.replace("Pre-sale pricing ends ", "") + " There's nothing else for you to do before it airs." : "Booking early means there's nothing left for you to do in December."],
